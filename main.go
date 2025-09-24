@@ -130,12 +130,13 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	secure := r.FormValue("secure") == "on"
+	customID := strings.TrimSpace(r.FormValue("custom_id"))
 
 	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
 		url = "https://" + url
 	}
 
-	short, err := s.createShortLink(url, secure)
+	short, err := s.createShortLink(url, secure, customID)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to create short link: %v", err), http.StatusInternalServerError)
 		return
@@ -178,8 +179,9 @@ func (s *Server) handleList(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleAPICreate(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		URL    string `json:"url"`
-		Secure bool   `json:"secure"`
+		URL      string `json:"url"`
+		Secure   bool   `json:"secure"`
+		CustomID string `json:"custom_id"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -196,7 +198,7 @@ func (s *Server) handleAPICreate(w http.ResponseWriter, r *http.Request) {
 		req.URL = "https://" + req.URL
 	}
 
-	short, err := s.createShortLink(req.URL, req.Secure)
+	short, err := s.createShortLink(req.URL, req.Secure, strings.TrimSpace(req.CustomID))
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to create short link: %v", err), http.StatusInternalServerError)
 		return
@@ -274,9 +276,17 @@ func (s *Server) handleAPIDelete(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"status": "deleted", "short": short})
 }
 
-func (s *Server) createShortLink(originalURL string, secure bool) (string, error) {
+func (s *Server) createShortLink(originalURL string, secure bool, customID string) (string, error) {
 	var short string
-	if secure {
+
+	// Use custom ID if provided
+	if customID != "" {
+		// Validate custom ID
+		if err := validateCustomID(customID); err != nil {
+			return "", err
+		}
+		short = customID
+	} else if secure {
 		short = generateSecureID()
 	} else {
 		short = generateShortID()
@@ -292,17 +302,26 @@ func (s *Server) createShortLink(originalURL string, secure bool) (string, error
 	err := s.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucketName))
 
-		for {
+		// Check if custom ID already exists
+		if customID != "" {
 			existing := b.Get([]byte(short))
-			if existing == nil {
-				break
+			if existing != nil {
+				return fmt.Errorf("custom ID '%s' already exists", short)
 			}
-			if secure {
-				short = generateSecureID()
-			} else {
-				short = generateShortID()
+		} else {
+			// For random IDs, keep generating until we find a unique one
+			for {
+				existing := b.Get([]byte(short))
+				if existing == nil {
+					break
+				}
+				if secure {
+					short = generateSecureID()
+				} else {
+					short = generateShortID()
+				}
+				link.Short = short
 			}
-			link.Short = short
 		}
 
 		data, err := json.Marshal(link)
@@ -397,6 +416,35 @@ func (s *Server) deleteLink(short string) error {
 
 		return b.Delete([]byte(short))
 	})
+}
+
+func validateCustomID(id string) error {
+	// Check length
+	if len(id) < 3 {
+		return fmt.Errorf("custom ID must be at least 3 characters long")
+	}
+	if len(id) > 50 {
+		return fmt.Errorf("custom ID must be no more than 50 characters long")
+	}
+
+	// Check for valid characters (alphanumeric, dash, underscore)
+	for _, ch := range id {
+		if !((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+			(ch >= '0' && ch <= '9') || ch == '-' || ch == '_') {
+			return fmt.Errorf("custom ID can only contain letters, numbers, dashes, and underscores")
+		}
+	}
+
+	// Check for reserved words (add more as needed)
+	reserved := []string{"api", "admin", "health", "static", "assets", "js", "css"}
+	lowerID := strings.ToLower(id)
+	for _, r := range reserved {
+		if lowerID == r {
+			return fmt.Errorf("'%s' is a reserved word and cannot be used as a custom ID", id)
+		}
+	}
+
+	return nil
 }
 
 func generateShortID() string {

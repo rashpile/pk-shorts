@@ -54,3 +54,46 @@ func TestGenerateSecureID(t *testing.T) {
 		t.Error("Secure IDs should be longer than regular IDs for better security")
 	}
 }
+
+func TestValidateCustomID(t *testing.T) {
+	// Helper to create strings of specific length
+	makeString := func(length int) string {
+		result := ""
+		for i := 0; i < length; i++ {
+			result += "a"
+		}
+		return result
+	}
+
+	tests := []struct {
+		id        string
+		shouldErr bool
+		desc      string
+	}{
+		{"my-link", false, "valid ID with dash"},
+		{"user_123", false, "valid ID with underscore and numbers"},
+		{"MyLink", false, "valid ID with uppercase"},
+		{"abc", false, "minimum length ID"},
+		{makeString(50), false, "maximum length ID"},
+		{"ab", true, "too short"},
+		{makeString(51), true, "too long"},
+		{"my link", true, "contains space"},
+		{"my@link", true, "contains invalid character"},
+		{"admin", true, "reserved word"},
+		{"api", true, "reserved word"},
+		{"", true, "empty string"},
+		{"a", true, "single character"},
+		{"aa", true, "two characters"},
+	}
+
+	for _, test := range tests {
+		err := validateCustomID(test.id)
+		if (err != nil) != test.shouldErr {
+			if test.shouldErr {
+				t.Errorf("%s: expected error for ID '%s' but got none", test.desc, test.id)
+			} else {
+				t.Errorf("%s: unexpected error for ID '%s': %v", test.desc, test.id, err)
+			}
+		}
+	}
+}

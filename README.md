@@ -6,6 +6,7 @@ A lightweight, fast, and simple link shortener service written in Go with an emb
 
 - 🔗 Simple URL shortening with random 8-character IDs
 - 🔐 Optional secure mode with 16-character IDs (resistant to guessing attacks)
+- ✏️ Custom ID support - choose your own memorable short links
 - 📊 Click tracking for each shortened link
 - 🗑️ Delete functionality for managing links
 - 🎨 Clean, responsive web UI (no JavaScript frameworks)
@@ -49,10 +50,20 @@ make build
 - **Create short link**: `POST /sui/api/create`
   - Standard: `{"url": "https://example.com"}`
   - Secure: `{"url": "https://example.com", "secure": true}`
+  - Custom ID: `{"url": "https://example.com", "custom_id": "my-link"}`
 - **List all links**: `GET /sui/api/list`
 - **Delete link**: `DELETE /sui/api/delete/{shortcode}`
 - **Redirect**: `GET /s/{shortcode}`
 - **Health check**: `GET /health`
+
+## Custom IDs
+
+When creating custom IDs, follow these rules:
+- 3-50 characters long
+- Only letters (a-z, A-Z), numbers (0-9), dashes (-), and underscores (_)
+- Must be unique (not already in use)
+- Cannot use reserved words: api, admin, health, static, assets, js, css
+- Secure mode is disabled when using custom IDs
 
 ## Configuration
 
