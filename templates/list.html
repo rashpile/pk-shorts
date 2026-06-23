@@ -189,7 +189,7 @@
                 {{range .Links}}
                 <tr>
                     <td>
-                        <a href="http://{{$.Host}}{{$.Prefix}}/{{.Short}}" target="_blank" class="short-link">
+                        <a href="{{$.Scheme}}://{{$.Host}}{{$.Prefix}}/{{.Short}}" target="_blank" class="short-link">
                             {{.Short}}
                         </a>
                     </td>

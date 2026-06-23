@@ -104,11 +104,29 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/health", s.handleHealth).Methods("GET")
 }
 
+// scheme returns the request scheme, honoring reverse-proxy headers so that
+// links generated behind a TLS-terminating proxy use https. It checks
+// X-Forwarded-Proto first, then falls back to the request's TLS state.
+func scheme(r *http.Request) string {
+	if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
+		// May be a comma-separated list (proto, proto); take the first.
+		if i := strings.IndexByte(proto, ','); i >= 0 {
+			proto = proto[:i]
+		}
+		return strings.TrimSpace(proto)
+	}
+	if r.TLS != nil {
+		return "https"
+	}
+	return "http"
+}
+
 func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	data := map[string]interface{}{
 		"UIPrefix": s.uiPrefix,
 		"Prefix":   s.prefix,
 		"Host":     r.Host,
+		"Scheme":   scheme(r),
 	}
 
 	if err := s.tmpl.ExecuteTemplate(w, "index.html", data); err != nil {
@@ -146,8 +164,9 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
 		"UIPrefix": s.uiPrefix,
 		"Prefix":   s.prefix,
 		"Host":     r.Host,
+		"Scheme":   scheme(r),
 		"Success":  true,
-		"ShortURL": fmt.Sprintf("http://%s%s/%s", r.Host, s.prefix, short),
+		"ShortURL": fmt.Sprintf("%s://%s%s/%s", scheme(r), r.Host, s.prefix, short),
 		"Original": url,
 	}
 
@@ -168,6 +187,7 @@ func (s *Server) handleList(w http.ResponseWriter, r *http.Request) {
 		"UIPrefix": s.uiPrefix,
 		"Prefix":   s.prefix,
 		"Host":     r.Host,
+		"Scheme":   scheme(r),
 		"Links":    links,
 	}
 
@@ -206,7 +226,7 @@ func (s *Server) handleAPICreate(w http.ResponseWriter, r *http.Request) {
 
 	resp := map[string]interface{}{
 		"short":     short,
-		"short_url": fmt.Sprintf("http://%s%s/%s", r.Host, s.prefix, short),
+		"short_url": fmt.Sprintf("%s://%s%s/%s", scheme(r), r.Host, s.prefix, short),
 		"original":  req.URL,
 		"secure":    req.Secure,
 	}
