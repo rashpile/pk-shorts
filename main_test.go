@@ -1,8 +1,40 @@
 package main
 
 import (
+	"crypto/tls"
+	"net/http"
 	"testing"
 )
+
+func TestScheme(t *testing.T) {
+	tests := []struct {
+		name     string
+		header   string
+		tls      bool
+		expected string
+	}{
+		{"forwarded https", "https", false, "https"},
+		{"forwarded http", "http", false, "http"},
+		{"forwarded list takes first", "https, http", false, "https"},
+		{"tls fallback", "", true, "https"},
+		{"plain fallback", "", false, "http"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r, _ := http.NewRequest("GET", "/", nil)
+			if tt.header != "" {
+				r.Header.Set("X-Forwarded-Proto", tt.header)
+			}
+			if tt.tls {
+				r.TLS = &tls.ConnectionState{}
+			}
+			if got := scheme(r); got != tt.expected {
+				t.Errorf("scheme() = %q, want %q", got, tt.expected)
+			}
+		})
+	}
+}
 
 func TestGenerateShortID(t *testing.T) {
 	id1 := generateShortID()
