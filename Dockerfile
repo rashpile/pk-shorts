@@ -49,6 +49,7 @@ USER appuser
 ENV PORT=8080
 ENV SHORT_PREFIX=/s
 ENV UI_PREFIX=/sui
+ENV DB_PATH=/app/data/links.db
 
 # Expose port
 EXPOSE 8080

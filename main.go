@@ -22,7 +22,7 @@ import (
 const (
 	defaultPrefix     = "/s"
 	defaultUIPrefix   = "/sui"
-	dbFile            = "links.db"
+	defaultDBFile     = "links.db"
 	bucketName        = "links"
 	shortIDLength     = 8
 	secureIDLength    = 16
@@ -44,6 +44,11 @@ type Server struct {
 }
 
 func NewServer() (*Server, error) {
+	dbFile := os.Getenv("DB_PATH")
+	if dbFile == "" {
+		dbFile = defaultDBFile
+	}
+
 	db, err := bolt.Open(dbFile, 0600, &bolt.Options{Timeout: 1 * time.Second})
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
